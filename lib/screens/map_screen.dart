@@ -7,6 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/location_share_service.dart';
+
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
@@ -87,6 +89,11 @@ class _MapPageState extends State<MapPage> {
         ..add(firstPoint);
     });
 
+    LocationShareService.updateMyLocation(
+      position: firstPoint,
+      isTracking: true,
+    );
+
     trackingTimer?.cancel();
     trackingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (startedAt == null) return;
@@ -101,7 +108,7 @@ class _MapPageState extends State<MapPage> {
         accuracy: LocationAccuracy.best,
         distanceFilter: 3,
       ),
-    ).listen((position) {
+    ).listen((position) async {
       final point = LatLng(position.latitude, position.longitude);
 
       setState(() {
@@ -116,12 +123,24 @@ class _MapPageState extends State<MapPage> {
         currentPosition = point;
         trackPoints.add(point);
       });
+
+      LocationShareService.updateMyLocation(
+        position: point,
+        isTracking: true,
+      );
     });
   }
 
   Future<void> stopTracking() async {
     await positionStream?.cancel();
     trackingTimer?.cancel();
+
+    if (currentPosition != null) {
+      LocationShareService.updateMyLocation(
+        position: currentPosition!,
+        isTracking: false,
+      );
+    }
 
     final prefs = await SharedPreferences.getInstance();
 

@@ -1,16 +1,9 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'screens/map_screen.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 
-Future<void> signInAnonymously() async {
-  final userCredential = await FirebaseAuth.instance.signInAnonymously();
-  print('UID: ${userCredential.user!.uid}');
-}
+import 'firebase_options.dart';
+import 'screens/map_screen.dart';
+import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +12,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-import 'services/auth_service.dart';
+  final user = await AuthService.signInAnonymously();
+  print('UID: ${user.uid}');
 
   runApp(const BadadaApp());
 }
@@ -87,7 +81,10 @@ class HomePage extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         title: Text(title),
-        trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        trailing: Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -102,7 +99,10 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('🌊 오늘의 해루질', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            const Text(
+              '🌊 오늘의 해루질',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 20),
             infoCard('📍 현재 위치', '위치 정보 준비중'),
             infoCard('🌊 간조', '02:40'),
@@ -119,82 +119,23 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class _MapPageState extends State<MapPage> {
-  LatLng? currentPosition;
-
-  @override
-  void initState() {
-    super.initState();
-    loadCurrentLocation();
-  }
-
-  Future<void> loadCurrentLocation() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      return;
-    }
-
-    final position = await Geolocator.getCurrentPosition();
-
-    setState(() {
-      currentPosition = LatLng(position.latitude, position.longitude);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final center = currentPosition ?? LatLng(36.8151, 127.1139);
-
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: center,
-        initialZoom: 15,
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.badada.app',
-        ),
-        if (currentPosition != null)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: currentPosition!,
-                width: 50,
-                height: 50,
-                child: const Icon(
-                  Icons.my_location,
-                  size: 40,
-                ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-}
 class RecordPage extends StatelessWidget {
   const RecordPage({super.key});
+
   @override
   Widget build(BuildContext context) => const Center(child: Text('📝 기록 화면'));
 }
 
 class FriendsPage extends StatelessWidget {
   const FriendsPage({super.key});
+
   @override
   Widget build(BuildContext context) => const Center(child: Text('👥 친구 화면'));
 }
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
   @override
   Widget build(BuildContext context) => const Center(child: Text('⚙ 설정 화면'));
 }
