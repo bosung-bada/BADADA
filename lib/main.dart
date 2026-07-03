@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/map_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -6,11 +7,20 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
+Future<void> signInAnonymously() async {
+  final userCredential = await FirebaseAuth.instance.signInAnonymously();
+  print('UID: ${userCredential.user!.uid}');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+import 'services/auth_service.dart';
+
   runApp(const BadadaApp());
 }
 
