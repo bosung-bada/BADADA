@@ -3,7 +3,12 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:latlong2/latlong.dart';
 
 class LocationShareService {
-  static final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  static final FirebaseDatabase _database = FirebaseDatabase.instanceFor(
+    app: FirebaseAuth.instance.app,
+    databaseURL: 'https://badada-efbb5-default-rtdb.firebaseio.com/',
+  );
+
+  static final DatabaseReference _db = _database.ref();
 
   static Future<void> updateMyLocation({
     required LatLng position,

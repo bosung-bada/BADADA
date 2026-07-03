@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/team_member_location.dart';
 import '../services/location_share_service.dart';
+import '../services/team_location_service.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -19,8 +22,10 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   LatLng? currentPosition;
   final List<LatLng> trackPoints = [];
+  List<TeamMemberLocation> teamMembers = [];
 
   StreamSubscription<Position>? positionStream;
+  StreamSubscription<List<TeamMemberLocation>>? teamSubscription;
   Timer? trackingTimer;
 
   bool isTracking = false;
@@ -32,11 +37,18 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
     loadCurrentLocation();
+
+    teamSubscription = TeamLocationService.watchTeamMembers().listen((members) {
+      setState(() {
+        teamMembers = members;
+      });
+    });
   }
 
   @override
   void dispose() {
     positionStream?.cancel();
+    teamSubscription?.cancel();
     trackingTimer?.cancel();
     super.dispose();
   }
@@ -108,7 +120,7 @@ class _MapPageState extends State<MapPage> {
         accuracy: LocationAccuracy.best,
         distanceFilter: 3,
       ),
-    ).listen((position) async {
+    ).listen((position) {
       final point = LatLng(position.latitude, position.longitude);
 
       setState(() {
@@ -185,6 +197,56 @@ class _MapPageState extends State<MapPage> {
     return '$hours:$minutes:$seconds';
   }
 
+  List<Marker> buildMarkers() {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+
+    final markers = <Marker>[];
+
+    if (currentPosition != null) {
+      markers.add(
+        Marker(
+          point: currentPosition!,
+          width: 60,
+          height: 60,
+          child: const Icon(
+            Icons.my_location,
+            size: 42,
+          ),
+        ),
+      );
+    }
+
+    for (final member in teamMembers) {
+      if (member.uid == currentUid) continue;
+
+      markers.add(
+        Marker(
+          point: LatLng(member.lat, member.lng),
+          width: 100,
+          height: 76,
+          child: Column(
+            children: [
+              const Icon(
+                Icons.person_pin_circle,
+                size: 42,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                color: Colors.white,
+                child: Text(
+                  member.name.isEmpty ? '팀원' : member.name,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return markers;
+  }
+
   @override
   Widget build(BuildContext context) {
     final center = currentPosition ?? LatLng(36.8151, 127.1139);
@@ -211,17 +273,7 @@ class _MapPageState extends State<MapPage> {
                     ),
                   ],
                 ),
-              if (currentPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: currentPosition!,
-                      width: 50,
-                      height: 50,
-                      child: const Icon(Icons.my_location, size: 40),
-                    ),
-                  ],
-                ),
+              MarkerLayer(markers: buildMarkers()),
             ],
           ),
           if (isTracking)
@@ -248,6 +300,7 @@ class _MapPageState extends State<MapPage> {
                         '🚶 이동거리: ${(totalDistance / 1000).toStringAsFixed(2)} km',
                       ),
                       Text('📍 기록 좌표: ${trackPoints.length}개'),
+                      Text('👥 팀원: ${teamMembers.length}명'),
                     ],
                   ),
                 ),
