@@ -156,6 +156,17 @@ class HomePage extends StatelessWidget {
             ElevatedButton(onPressed: () {}, child: const Text('🚨 SOS')),
             ElevatedButton(onPressed: () {}, child: const Text('📍 위치공유 시작')),
             ElevatedButton(onPressed: () {}, child: const Text('📝 오늘 기록하기')),
+            ElevatedButton(
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TeamScreen(),
+      ),
+    );
+  },
+  child: const Text('👥 팀 관리'),
+),
           ],
         ),
       ),

@@ -18,11 +18,24 @@ class _TeamScreenState extends State<TeamScreen> {
   final TextEditingController teamNameController = TextEditingController();
   final Set<String> selectedFriendUids = {};
 
-  Future<void> createTeam() async {
-    final teamName = teamNameController.text.trim();
+Future<void> createTeam() async {
+  final teamName = teamNameController.text.trim();
 
-    if (teamName.isEmpty) return;
+  if (teamName.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('팀 이름을 입력해주세요.')),
+    );
+    return;
+  }
 
+  if (selectedFriendUids.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('팀에 추가할 친구를 선택해주세요.')),
+    );
+    return;
+  }
+
+  try {
     await TeamService.createTeam(
       teamName: teamName,
       memberUids: selectedFriendUids.toList(),
@@ -38,7 +51,12 @@ class _TeamScreenState extends State<TeamScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('팀이 생성되었습니다.')),
     );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('팀 생성 실패: $e')),
+    );
   }
+}
 
   Widget buildFriendCheckbox(FriendUser friend) {
     final isSelected = selectedFriendUids.contains(friend.uid);

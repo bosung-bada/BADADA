@@ -38,11 +38,24 @@ class _MapPageState extends State<MapPage> {
     super.initState();
     loadCurrentLocation();
 
-    teamSubscription = TeamLocationService.watchSelectedTeamLocations().listen((members) {
-      setState(() {
-        teamMembers = members;
-      });
-    });
+   teamSubscription =
+    TeamLocationService.watchSelectedTeamLocations().listen((members) {
+  print('========== TEAM LOCATION DEBUG ==========');
+  print('읽은 팀원 수: ${members.length}');
+
+  for (final member in members) {
+    print('UID: ${member.uid}');
+    print('이름: ${member.name}');
+    print('위도: ${member.lat}');
+    print('경도: ${member.lng}');
+    print('추적중: ${member.isTracking}');
+    print('----------------------------------------');
+  }
+
+  setState(() {
+    teamMembers = members;
+  });
+});
   }
 
   @override
@@ -198,54 +211,62 @@ class _MapPageState extends State<MapPage> {
   }
 
   List<Marker> buildMarkers() {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+  final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
-    final markers = <Marker>[];
+  final markers = <Marker>[];
 
-    if (currentPosition != null) {
-      markers.add(
-        Marker(
-          point: currentPosition!,
-          width: 60,
-          height: 60,
-          child: const Icon(
-            Icons.my_location,
-            size: 42,
-          ),
-        ),
-      );
-    }
+  for (final member in teamMembers) {
+    if (member.uid == currentUid) continue;
 
-    for (final member in teamMembers) {
-      if (member.uid == currentUid) continue;
+    print('친구 마커 생성: ${member.name}');
 
-      markers.add(
-        Marker(
-          point: LatLng(member.lat, member.lng),
-          width: 100,
-          height: 76,
-          child: Column(
-            children: [
-              const Icon(
-                Icons.person_pin_circle,
-                size: 42,
+    markers.add(
+      Marker(
+        // TODO(BADADA): 테스트용 오프셋. 실제 휴대폰 테스트 후 LatLng(member.lat, member.lng)로 복구.
+        point: LatLng(
+  member.lat,
+  member.lng,
+),
+        width: 120,
+        height: 80,
+        child: Column(
+          children: [
+            const Icon(
+              Icons.person_pin_circle,
+              size: 46,
+              color: Colors.blue,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              color: Colors.white,
+              child: Text(
+                member.name.isEmpty ? '팀원' : member.name,
+                style: const TextStyle(fontSize: 12),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                color: Colors.white,
-                child: Text(
-                  member.name.isEmpty ? '팀원' : member.name,
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
-
-    return markers;
+      ),
+    );
   }
+
+  if (currentPosition != null) {
+    markers.add(
+      Marker(
+        point: currentPosition!,
+        width: 70,
+        height: 70,
+        child: const Icon(
+          Icons.my_location,
+          size: 48,
+          color: Colors.green,
+        ),
+      ),
+    );
+  }
+
+  return markers;
+}
 
   @override
   Widget build(BuildContext context) {
