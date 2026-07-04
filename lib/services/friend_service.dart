@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../models/friend_request.dart';
+import '../models/friend_user.dart';
 
 class FriendService {
   static final FirebaseDatabase _database = FirebaseDatabase.instanceFor(
@@ -66,5 +67,33 @@ class FriendService {
     if (me == null) return;
 
     await _db.child('friend_requests/${me.uid}/$requesterUid').remove();
+  }
+
+  static Stream<List<FriendUser>> watchMyFriends() {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) return Stream.value([]);
+
+    return _db.child('friends/${me.uid}').onValue.asyncMap((event) async {
+      final data = event.snapshot.value;
+      if (data == null) return <FriendUser>[];
+
+      final map = data as Map<dynamic, dynamic>;
+      final friends = <FriendUser>[];
+
+      for (final entry in map.entries) {
+        final friendUid = entry.key.toString();
+        final nicknameSnapshot =
+            await _db.child('users/$friendUid/nickname').get();
+
+        friends.add(
+          FriendUser(
+            uid: friendUid,
+            nickname: nicknameSnapshot.value?.toString() ?? '이름 없음',
+          ),
+        );
+      }
+
+      return friends;
+    });
   }
 }

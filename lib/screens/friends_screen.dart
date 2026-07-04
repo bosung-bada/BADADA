@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/friend_request.dart';
+import '../models/friend_user.dart';
 import '../services/friend_service.dart';
 import '../services/user_profile_service.dart';
 
@@ -92,26 +93,39 @@ class _FriendsScreenState extends State<FriendsScreen> {
         title: Text(request.nickname),
         subtitle: const Text('해루질 친구 요청을 보냈습니다.'),
         trailing: Wrap(
-  spacing: 8,
-  children: [
-    ElevatedButton(
-      onPressed: () async {
-        await FriendService.acceptFriendRequest(
-          requesterUid: request.uid,
-        );
-      },
-      child: const Text('수락'),
-    ),
-    OutlinedButton(
-      onPressed: () async {
-        await FriendService.rejectFriendRequest(
-          requesterUid: request.uid,
-        );
-      },
-      child: const Text('거절'),
-    ),
-  ],
-),
+          spacing: 8,
+          children: [
+            ElevatedButton(
+              onPressed: () async {
+                await FriendService.acceptFriendRequest(
+                  requesterUid: request.uid,
+                );
+              },
+              child: const Text('수락'),
+            ),
+            OutlinedButton(
+              onPressed: () async {
+                await FriendService.rejectFriendRequest(
+                  requesterUid: request.uid,
+                );
+              },
+              child: const Text('거절'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildFriendCard(FriendUser friend) {
+    return Card(
+      child: ListTile(
+        leading: const CircleAvatar(
+          child: Icon(Icons.person),
+        ),
+        title: Text(friend.nickname),
+        subtitle: const Text('BADADA 친구'),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
@@ -224,15 +238,28 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
             const SizedBox(height: 8),
 
-            const Expanded(
-              child: Card(
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: Icon(Icons.person),
-                  ),
-                  title: Text('친구가 없습니다.'),
-                  subtitle: Text('친구 요청을 수락하면 여기에 표시됩니다.'),
-                ),
+            Expanded(
+              child: StreamBuilder<List<FriendUser>>(
+                stream: FriendService.watchMyFriends(),
+                builder: (context, snapshot) {
+                  final friends = snapshot.data ?? [];
+
+                  if (friends.isEmpty) {
+                    return const Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: Icon(Icons.person),
+                        ),
+                        title: Text('친구가 없습니다.'),
+                        subtitle: Text('친구 요청을 수락하면 여기에 표시됩니다.'),
+                      ),
+                    );
+                  }
+
+                  return ListView(
+                    children: friends.map(buildFriendCard).toList(),
+                  );
+                },
               ),
             ),
           ],
