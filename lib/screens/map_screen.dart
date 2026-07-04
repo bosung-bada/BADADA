@@ -8,10 +8,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../controllers/map_controller.dart';
+import '../models/sos_event.dart';
 import '../models/team_member_location.dart';
 import '../services/location_share_service.dart';
 import '../services/sos_service.dart';
 import '../services/team_location_service.dart';
+import '../widgets/sos_popup.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -28,6 +31,7 @@ class _MapPageState extends State<MapPage> {
   StreamSubscription<Position>? positionStream;
   StreamSubscription<List<TeamMemberLocation>>? teamSubscription;
   Timer? trackingTimer;
+  final BadadaMapController badadaController = BadadaMapController();
 
   bool isTracking = false;
   DateTime? startedAt;
@@ -46,6 +50,10 @@ class _MapPageState extends State<MapPage> {
         });
       },
     );
+
+    badadaController.startSosListener(
+      onSosReceived: handleSosReceived,
+    );
   }
 
   @override
@@ -53,6 +61,7 @@ class _MapPageState extends State<MapPage> {
     positionStream?.cancel();
     teamSubscription?.cancel();
     trackingTimer?.cancel();
+    badadaController.dispose();
     super.dispose();
   }
 
@@ -278,6 +287,22 @@ class _MapPageState extends State<MapPage> {
         SnackBar(content: Text('SOS 전송 실패: $e')),
       );
     }
+  }
+
+  Future<void> handleSosReceived(SosEvent sos) async {
+    if (!mounted) return;
+
+    await showSosPopup(
+      context: context,
+      sos: sos,
+      onMoveToMap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${sos.name}님의 SOS 위치 확인 기능은 다음 단계에서 연결합니다.'),
+          ),
+        );
+      },
+    );
   }
 
   String formatDuration(Duration duration) {
