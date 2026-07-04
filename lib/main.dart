@@ -1,3 +1,4 @@
+import 'screens/team_screen.dart';
 import 'screens/friends_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'services/user_profile_service.dart';
@@ -89,7 +90,7 @@ class _MainScreenState extends State<MainScreen> {
     HomePage(),
     MapPage(),
     RecordPage(),
-    FriendsScreen(),
+    TeamScreen(),
     SettingsPage(),
   ];
 
