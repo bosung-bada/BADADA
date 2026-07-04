@@ -31,16 +31,11 @@ class FriendService {
 
   static Stream<List<FriendRequest>> watchReceivedRequests() {
     final me = FirebaseAuth.instance.currentUser;
-    if (me == null) {
-      return Stream.value([]);
-    }
+    if (me == null) return Stream.value([]);
 
     return _db.child('friend_requests/${me.uid}').onValue.map((event) {
       final data = event.snapshot.value;
-
-      if (data == null) {
-        return <FriendRequest>[];
-      }
+      if (data == null) return <FriendRequest>[];
 
       final map = data as Map<dynamic, dynamic>;
 
@@ -51,5 +46,25 @@ class FriendService {
         );
       }).toList();
     });
+  }
+
+  static Future<void> acceptFriendRequest({
+    required String requesterUid,
+  }) async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) return;
+
+    await _db.child('friends/${me.uid}/$requesterUid').set(true);
+    await _db.child('friends/$requesterUid/${me.uid}').set(true);
+    await _db.child('friend_requests/${me.uid}/$requesterUid').remove();
+  }
+
+  static Future<void> rejectFriendRequest({
+    required String requesterUid,
+  }) async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) return;
+
+    await _db.child('friend_requests/${me.uid}/$requesterUid').remove();
   }
 }

@@ -92,18 +92,26 @@ class _FriendsScreenState extends State<FriendsScreen> {
         title: Text(request.nickname),
         subtitle: const Text('해루질 친구 요청을 보냈습니다.'),
         trailing: Wrap(
-          spacing: 8,
-          children: [
-            ElevatedButton(
-              onPressed: () {},
-              child: const Text('수락'),
-            ),
-            OutlinedButton(
-              onPressed: () {},
-              child: const Text('거절'),
-            ),
-          ],
-        ),
+  spacing: 8,
+  children: [
+    ElevatedButton(
+      onPressed: () async {
+        await FriendService.acceptFriendRequest(
+          requesterUid: request.uid,
+        );
+      },
+      child: const Text('수락'),
+    ),
+    OutlinedButton(
+      onPressed: () async {
+        await FriendService.rejectFriendRequest(
+          requesterUid: request.uid,
+        );
+      },
+      child: const Text('거절'),
+    ),
+  ],
+),
       ),
     );
   }
