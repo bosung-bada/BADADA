@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/team_member_location.dart';
 import '../services/location_share_service.dart';
+import '../services/sos_service.dart';
 import '../services/team_location_service.dart';
 
 class MapPage extends StatefulWidget {
@@ -38,24 +39,13 @@ class _MapPageState extends State<MapPage> {
     super.initState();
     loadCurrentLocation();
 
-   teamSubscription =
-    TeamLocationService.watchSelectedTeamLocations().listen((members) {
-  print('========== TEAM LOCATION DEBUG ==========');
-  print('읽은 팀원 수: ${members.length}');
-
-  for (final member in members) {
-    print('UID: ${member.uid}');
-    print('이름: ${member.name}');
-    print('위도: ${member.lat}');
-    print('경도: ${member.lng}');
-    print('추적중: ${member.isTracking}');
-    print('----------------------------------------');
-  }
-
-  setState(() {
-    teamMembers = members;
-  });
-});
+    teamSubscription = TeamLocationService.watchSelectedTeamLocations().listen(
+      (members) {
+        setState(() {
+          teamMembers = members;
+        });
+      },
+    );
   }
 
   @override
@@ -88,6 +78,8 @@ class _MapPageState extends State<MapPage> {
       desiredAccuracy: LocationAccuracy.best,
     );
 
+    if (!mounted) return;
+
     setState(() {
       currentPosition = LatLng(position.latitude, position.longitude);
     });
@@ -114,14 +106,14 @@ class _MapPageState extends State<MapPage> {
         ..add(firstPoint);
     });
 
-    LocationShareService.updateMyLocation(
+    await LocationShareService.updateMyLocation(
       position: firstPoint,
       isTracking: true,
     );
 
     trackingTimer?.cancel();
     trackingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (startedAt == null) return;
+      if (startedAt == null || !mounted) return;
       setState(() {
         trackingDuration = DateTime.now().difference(startedAt!);
       });
@@ -133,7 +125,7 @@ class _MapPageState extends State<MapPage> {
         accuracy: LocationAccuracy.best,
         distanceFilter: 3,
       ),
-    ).listen((position) {
+    ).listen((position) async {
       final point = LatLng(position.latitude, position.longitude);
 
       setState(() {
@@ -149,7 +141,7 @@ class _MapPageState extends State<MapPage> {
         trackPoints.add(point);
       });
 
-      LocationShareService.updateMyLocation(
+      await LocationShareService.updateMyLocation(
         position: point,
         isTracking: true,
       );
@@ -158,10 +150,12 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> stopTracking() async {
     await positionStream?.cancel();
+    positionStream = null;
     trackingTimer?.cancel();
+    trackingTimer = null;
 
     if (currentPosition != null) {
-      LocationShareService.updateMyLocation(
+      await LocationShareService.updateMyLocation(
         position: currentPosition!,
         isTracking: false,
       );
@@ -190,6 +184,8 @@ class _MapPageState extends State<MapPage> {
 
     await prefs.setStringList('harvesting_records', records);
 
+    if (!mounted) return;
+
     setState(() {
       isTracking = false;
     });
@@ -203,6 +199,87 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  Future<void> showSosCountdown() async {
+    if (currentPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('현재 위치를 확인할 수 없습니다.')),
+      );
+      return;
+    }
+
+    int count = 3;
+    Timer? countdownTimer;
+    bool sent = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            countdownTimer ??= Timer.periodic(
+              const Duration(seconds: 1),
+              (timer) async {
+                if (!Navigator.of(dialogContext).canPop()) {
+                  timer.cancel();
+                  return;
+                }
+
+                if (count > 1) {
+                  setDialogState(() {
+                    count--;
+                  });
+                  return;
+                }
+
+                timer.cancel();
+                sent = true;
+                Navigator.of(dialogContext).pop();
+              },
+            );
+
+            return AlertDialog(
+              title: const Text('🚨 SOS 전송'),
+              content: Text('$count초 후 SOS가 전송됩니다.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    countdownTimer?.cancel();
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('취소'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    countdownTimer?.cancel();
+
+    if (!sent) return;
+    if (currentPosition == null) return;
+
+    try {
+      await SosService.sendSos(
+        position: currentPosition!,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🚨 SOS가 팀에 전송되었습니다.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('SOS 전송 실패: $e')),
+      );
+    }
+  }
+
   String formatDuration(Duration duration) {
     final hours = duration.inHours.toString().padLeft(2, '0');
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -211,62 +288,59 @@ class _MapPageState extends State<MapPage> {
   }
 
   List<Marker> buildMarkers() {
-  final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
-  final markers = <Marker>[];
+    final markers = <Marker>[];
 
-  for (final member in teamMembers) {
-    if (member.uid == currentUid) continue;
+    for (final member in teamMembers) {
+      if (member.uid == currentUid) continue;
 
-    print('친구 마커 생성: ${member.name}');
-
-    markers.add(
-      Marker(
-        // TODO(BADADA): 테스트용 오프셋. 실제 휴대폰 테스트 후 LatLng(member.lat, member.lng)로 복구.
-        point: LatLng(
-  member.lat,
-  member.lng,
-),
-        width: 120,
-        height: 80,
-        child: Column(
-          children: [
-            const Icon(
-              Icons.person_pin_circle,
-              size: 46,
-              color: Colors.blue,
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              color: Colors.white,
-              child: Text(
-                member.name.isEmpty ? '팀원' : member.name,
-                style: const TextStyle(fontSize: 12),
+      markers.add(
+        Marker(
+          point: LatLng(
+            member.lat,
+            member.lng,
+          ),
+          width: 120,
+          height: 80,
+          child: Column(
+            children: [
+              const Icon(
+                Icons.person_pin_circle,
+                size: 46,
+                color: Colors.blue,
               ),
-            ),
-          ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                color: Colors.white,
+                child: Text(
+                  member.name.isEmpty ? '팀원' : member.name,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  if (currentPosition != null) {
-    markers.add(
-      Marker(
-        point: currentPosition!,
-        width: 70,
-        height: 70,
-        child: const Icon(
-          Icons.my_location,
-          size: 48,
-          color: Colors.green,
+    if (currentPosition != null) {
+      markers.add(
+        Marker(
+          point: currentPosition!,
+          width: 70,
+          height: 70,
+          child: const Icon(
+            Icons.my_location,
+            size: 48,
+            color: Colors.green,
+          ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  return markers;
-}
+    return markers;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -331,15 +405,33 @@ class _MapPageState extends State<MapPage> {
             left: 20,
             right: 20,
             bottom: 24,
-            child: SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: isTracking ? stopTracking : startTracking,
-                child: Text(
-                  isTracking ? '🛑 해루질 종료' : '🟢 해루질 시작',
-                  style: const TextStyle(fontSize: 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: showSosCountdown,
+                    child: const Text(
+                      '🚨 SOS',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: isTracking ? stopTracking : startTracking,
+                    child: Text(
+                      isTracking ? '🛑 해루질 종료' : '🟢 해루질 시작',
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
