@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'selected_team_service.dart';
 import 'user_profile_service.dart';
 
 class LocationShareService {
@@ -19,9 +20,13 @@ class LocationShareService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    final teamId = await SelectedTeamService.getSelectedTeamId();
+    if (teamId == null) return;
+
     final nickname = await UserProfileService.getNickname();
 
-    await _db.child('teams/test-team/members/${user.uid}').set({
+    await _db.child('teams/$teamId/locations/${user.uid}').set({
+      'uid': user.uid,
       'name': nickname,
       'lat': position.latitude,
       'lng': position.longitude,
