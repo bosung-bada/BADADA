@@ -1,3 +1,5 @@
+import '../services/selected_team_service.dart';
+import '../services/selected_team_service.dart';
 import 'package:flutter/material.dart';
 
 import '../models/friend_user.dart';
@@ -57,17 +59,32 @@ class _TeamScreenState extends State<TeamScreen> {
     );
   }
 
-  Widget buildTeamCard(TeamModel team) {
-    return Card(
-      child: ListTile(
-        leading: const CircleAvatar(
-          child: Icon(Icons.groups),
-        ),
-        title: Text(team.name),
-        subtitle: Text('멤버 ${team.memberUids.length}명'),
+Widget buildTeamCard(TeamModel team) {
+  return Card(
+    child: ListTile(
+      leading: const CircleAvatar(
+        child: Icon(Icons.groups),
       ),
-    );
-  }
+      title: Text(team.name),
+      subtitle: Text('멤버 ${team.memberUids.length}명'),
+      trailing: const Icon(Icons.check_circle_outline),
+      onTap: () async {
+        await SelectedTeamService.saveSelectedTeam(
+          teamId: team.id,
+          teamName: team.name,
+        );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${team.name} 팀이 선택되었습니다.'),
+          ),
+        );
+      },
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

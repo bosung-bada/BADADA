@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../models/team_member_location.dart';
+import 'selected_team_service.dart';
 
 class TeamLocationService {
   static final FirebaseDatabase _database = FirebaseDatabase.instanceFor(
@@ -11,8 +12,15 @@ class TeamLocationService {
 
   static final DatabaseReference _db = _database.ref();
 
-  static Stream<List<TeamMemberLocation>> watchTeamMembers() {
-    return _db.child('teams/test-team/members').onValue.map((event) {
+  static Stream<List<TeamMemberLocation>> watchSelectedTeamLocations() async* {
+    final teamId = await SelectedTeamService.getSelectedTeamId();
+
+    if (teamId == null) {
+      yield <TeamMemberLocation>[];
+      return;
+    }
+
+    yield* _db.child('teams/$teamId/locations').onValue.map((event) {
       final data = event.snapshot.value;
 
       if (data == null) {

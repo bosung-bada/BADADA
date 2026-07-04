@@ -43,6 +43,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
     final uid = await UserProfileService.findUidByNickname(nickname);
 
+    print('검색 닉네임: $nickname');
+    print('찾은 UID: $uid');
+
     setState(() {
       isSearching = false;
 

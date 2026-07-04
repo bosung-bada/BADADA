@@ -86,13 +86,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int selectedIndex = 0;
 
-  final pages = const [
-    HomePage(),
-    MapPage(),
-    RecordPage(),
-    TeamScreen(),
-    SettingsPage(),
-  ];
+final pages = const [
+  HomePage(),
+  MapPage(),
+  RecordPage(),
+  FriendsScreen(),
+  SettingsPage(),
+];
 
   @override
   Widget build(BuildContext context) {

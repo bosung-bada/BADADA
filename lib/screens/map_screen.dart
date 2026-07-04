@@ -38,7 +38,7 @@ class _MapPageState extends State<MapPage> {
     super.initState();
     loadCurrentLocation();
 
-    teamSubscription = TeamLocationService.watchTeamMembers().listen((members) {
+    teamSubscription = TeamLocationService.watchSelectedTeamLocations().listen((members) {
       setState(() {
         teamMembers = members;
       });
