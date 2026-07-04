@@ -1,3 +1,7 @@
+import 'screens/friends_screen.dart';
+import 'screens/profile_setup_screen.dart';
+import 'services/user_profile_service.dart';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -18,16 +22,55 @@ void main() async {
   runApp(const BadadaApp());
 }
 
-class BadadaApp extends StatelessWidget {
+class BadadaApp extends StatefulWidget {
   const BadadaApp({super.key});
 
   @override
+  State<BadadaApp> createState() => _BadadaAppState();
+}
+
+class _BadadaAppState extends State<BadadaApp> {
+  bool isProfileReady = false;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    checkProfile();
+  }
+
+  Future<void> checkProfile() async {
+    final nickname = await UserProfileService.getNickname();
+
+    setState(() {
+      isProfileReady = nickname != '팀원';
+      isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
     return MaterialApp(
       title: '바다다',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true),
-      home: const MainScreen(),
+      home: isProfileReady
+          ? const MainScreen()
+          : ProfileSetupScreen(
+              onProfileSaved: () {
+                setState(() {
+                  isProfileReady = true;
+                });
+              },
+            ),
     );
   }
 }
@@ -46,7 +89,7 @@ class _MainScreenState extends State<MainScreen> {
     HomePage(),
     MapPage(),
     RecordPage(),
-    FriendsPage(),
+    FriendsScreen(),
     SettingsPage(),
   ];
 
@@ -124,13 +167,6 @@ class RecordPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Center(child: Text('📝 기록 화면'));
-}
-
-class FriendsPage extends StatelessWidget {
-  const FriendsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) => const Center(child: Text('👥 친구 화면'));
 }
 
 class SettingsPage extends StatelessWidget {

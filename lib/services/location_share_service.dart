@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'user_profile_service.dart';
+
 class LocationShareService {
   static final FirebaseDatabase _database = FirebaseDatabase.instanceFor(
     app: FirebaseAuth.instance.app,
@@ -17,8 +19,10 @@ class LocationShareService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    final nickname = await UserProfileService.getNickname();
+
     await _db.child('teams/test-team/members/${user.uid}').set({
-      'name': '보성',
+      'name': nickname,
       'lat': position.latitude,
       'lng': position.longitude,
       'isTracking': isTracking,
