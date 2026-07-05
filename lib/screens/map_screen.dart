@@ -12,6 +12,7 @@ import '../controllers/map_controller.dart';
 import '../models/sos_event.dart';
 import '../models/team_member_location.dart';
 import '../services/location_share_service.dart';
+import '../services/idle_detector_service.dart';
 import '../services/sos_service.dart';
 import '../services/team_location_service.dart';
 import '../widgets/sos_popup.dart';
@@ -34,6 +35,11 @@ class _MapPageState extends State<MapPage> {
   final BadadaMapController badadaController = BadadaMapController();
   final MapController mapController = MapController();
   SosEvent? activeSos;
+  final IdleDetectorService idleDetector = IdleDetectorService(
+    // TODO(BADADA): 베타/출시 전 Duration(minutes: 10)으로 복구.
+    idleLimit: const Duration(seconds: 30),
+  );
+  bool hasShownIdleWarning = false;
 
   bool isTracking = false;
   DateTime? startedAt;
@@ -122,6 +128,11 @@ class _MapPageState extends State<MapPage> {
       isTracking: true,
     );
 
+    idleDetector.start(
+      startPosition: firstPoint,
+    );
+    hasShownIdleWarning = false;
+
     trackingTimer?.cancel();
     trackingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (startedAt == null || !mounted) return;
@@ -138,6 +149,23 @@ class _MapPageState extends State<MapPage> {
       ),
     ).listen((position) async {
       final point = LatLng(position.latitude, position.longitude);
+
+      idleDetector.updatePosition(
+        currentPosition: point,
+      );
+
+      if (idleDetector.isIdleTooLong && !hasShownIdleWarning) {
+        hasShownIdleWarning = true;
+        debugPrint('🚨 IDLE DETECTED');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ 30초 동안 움직임이 감지되지 않았습니다. 테스트 알림입니다.'),
+            ),
+          );
+        }
+      }
 
       setState(() {
         if (trackPoints.isNotEmpty) {
@@ -164,6 +192,8 @@ class _MapPageState extends State<MapPage> {
     positionStream = null;
     trackingTimer?.cancel();
     trackingTimer = null;
+    idleDetector.stop();
+    hasShownIdleWarning = false;
 
     if (currentPosition != null) {
       await LocationShareService.updateMyLocation(
