@@ -32,6 +32,8 @@ class _MapPageState extends State<MapPage> {
   StreamSubscription<List<TeamMemberLocation>>? teamSubscription;
   Timer? trackingTimer;
   final BadadaMapController badadaController = BadadaMapController();
+  final MapController mapController = MapController();
+  SosEvent? activeSos;
 
   bool isTracking = false;
   DateTime? startedAt;
@@ -296,11 +298,13 @@ class _MapPageState extends State<MapPage> {
       context: context,
       sos: sos,
       onMoveToMap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${sos.name}님의 SOS 위치 확인 기능은 다음 단계에서 연결합니다.'),
-          ),
-        );
+        final sosPoint = LatLng(sos.lat, sos.lng);
+
+        setState(() {
+          activeSos = sos;
+        });
+
+        mapController.move(sosPoint, 17);
       },
     );
   }
@@ -364,6 +368,37 @@ class _MapPageState extends State<MapPage> {
       );
     }
 
+    if (activeSos != null) {
+      markers.add(
+        Marker(
+          point: LatLng(activeSos!.lat, activeSos!.lng),
+          width: 130,
+          height: 90,
+          child: Column(
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.red,
+                size: 54,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                color: Colors.white,
+                child: Text(
+                  '🚨 ${activeSos!.name}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return markers;
   }
 
@@ -375,6 +410,7 @@ class _MapPageState extends State<MapPage> {
       body: Stack(
         children: [
           FlutterMap(
+            mapController: mapController,
             options: MapOptions(
               initialCenter: center,
               initialZoom: 15,
