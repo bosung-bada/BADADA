@@ -13,9 +13,11 @@ import '../models/sos_event.dart';
 import '../models/team_member_location.dart';
 import '../services/location_share_service.dart';
 import '../services/idle_detector_service.dart';
+import '../services/safety_manager.dart';
 import '../services/sos_service.dart';
 import '../services/team_location_service.dart';
 import '../widgets/sos_popup.dart';
+import '../widgets/safety_check_dialog.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -35,11 +37,14 @@ class _MapPageState extends State<MapPage> {
   final BadadaMapController badadaController = BadadaMapController();
   final MapController mapController = MapController();
   SosEvent? activeSos;
-  final IdleDetectorService idleDetector = IdleDetectorService(
-    // TODO(BADADA): 베타/출시 전 Duration(minutes: 10)으로 복구.
-    idleLimit: const Duration(seconds: 30),
+  final SafetyManager safetyManager = SafetyManager(
+    idleDetector: IdleDetectorService(
+      // TODO(BADADA): 베타/출시 전 Duration(minutes: 10)으로 복구.
+      idleLimit: const Duration(seconds: 30),
+    ),
   );
   bool hasShownIdleWarning = false;
+  bool isSafetyDialogOpen = false;
 
   bool isTracking = false;
   DateTime? startedAt;
@@ -128,17 +133,23 @@ class _MapPageState extends State<MapPage> {
       isTracking: true,
     );
 
-    idleDetector.start(
-      startPosition: firstPoint,
+    safetyManager.start(
+      position: firstPoint,
     );
     hasShownIdleWarning = false;
+    isSafetyDialogOpen = false;
 
     trackingTimer?.cancel();
-    trackingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    trackingTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       if (startedAt == null || !mounted) return;
+
       setState(() {
         trackingDuration = DateTime.now().difference(startedAt!);
       });
+
+      if (currentPosition != null) {
+        await handleIdleDetected(currentPosition!);
+      }
     });
 
     positionStream?.cancel();
@@ -150,22 +161,11 @@ class _MapPageState extends State<MapPage> {
     ).listen((position) async {
       final point = LatLng(position.latitude, position.longitude);
 
-      idleDetector.updatePosition(
-        currentPosition: point,
+      safetyManager.updatePosition(
+        position: point,
       );
 
-      if (idleDetector.isIdleTooLong && !hasShownIdleWarning) {
-        hasShownIdleWarning = true;
-        debugPrint('🚨 IDLE DETECTED');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('⚠️ 30초 동안 움직임이 감지되지 않았습니다. 테스트 알림입니다.'),
-            ),
-          );
-        }
-      }
+      await handleIdleDetected(point);
 
       setState(() {
         if (trackPoints.isNotEmpty) {
@@ -192,8 +192,9 @@ class _MapPageState extends State<MapPage> {
     positionStream = null;
     trackingTimer?.cancel();
     trackingTimer = null;
-    idleDetector.stop();
+    safetyManager.stop();
     hasShownIdleWarning = false;
+    isSafetyDialogOpen = false;
 
     if (currentPosition != null) {
       await LocationShareService.updateMyLocation(
@@ -236,6 +237,47 @@ class _MapPageState extends State<MapPage> {
         content: Text(
           '저장 완료: ${(totalDistance / 1000).toStringAsFixed(2)}km / 위치 ${trackPoints.length}개',
         ),
+      ),
+    );
+  }
+
+  Future<void> handleIdleDetected(LatLng point) async {
+    if (!isTracking) return;
+    if (!safetyManager.isUserIdle) return;
+    if (hasShownIdleWarning || isSafetyDialogOpen) return;
+
+    hasShownIdleWarning = true;
+    isSafetyDialogOpen = true;
+
+    debugPrint('🚨 IDLE DETECTED');
+
+    if (!mounted) return;
+
+    final isSafe = await showSafetyCheckDialog(
+      context: context,
+      countdownSeconds: 30,
+    );
+
+    isSafetyDialogOpen = false;
+
+    if (!mounted) return;
+
+    if (isSafe) {
+      safetyManager.reset(position: point);
+      hasShownIdleWarning = false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ 안전 확인 완료. 무이동 감지를 다시 시작합니다.'),
+        ),
+      );
+
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('⚠️ 응답이 없습니다. 다음 단계에서 팀원 경고/자동 SOS를 연결합니다.'),
       ),
     );
   }
