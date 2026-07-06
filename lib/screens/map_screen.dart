@@ -275,11 +275,14 @@ class _MapPageState extends State<MapPage> {
       return;
     }
 
+    debugPrint('🚨 AUTO SOS TRIGGER (TEST MODE)');
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('⚠️ 응답이 없습니다. 다음 단계에서 팀원 경고/자동 SOS를 연결합니다.'),
+        backgroundColor: Colors.red,
+        content: Text('🚨 AUTO SOS TEST MODE - 실제 전송은 비활성화되어 있습니다.'),
       ),
     );
+    hasShownIdleWarning = false;
   }
 
   Future<void> showSosCountdown() async {
